@@ -96,13 +96,26 @@ extension Text {
       return text
     }
 
-    self = textValues.reduce(Text(verbatim: "")) { partialResult, text in
-      Text("\(partialResult)\(text)")
-    }
+    self = Text.balancedConcat(textValues[...])
   }
 
   private init(placeholderSize size: CGSize) {
     self.init(SwiftUI.Image(size: size) { _ in })
+  }
+
+  // Build a balanced concatenation tree so long rich-text fragments do not recurse
+  // through LocalizedStringKey interpolation or a deeply linear Text chain.
+  private static func balancedConcat(_ texts: ArraySlice<Text>) -> Text {
+    switch texts.count {
+    case 0:
+      return Text(verbatim: "")
+    case 1:
+      return texts[texts.startIndex]
+    default:
+      let midpoint = texts.index(texts.startIndex, offsetBy: texts.count / 2)
+      return balancedConcat(texts[texts.startIndex..<midpoint])
+        + balancedConcat(texts[midpoint..<texts.endIndex])
+    }
   }
 }
 
