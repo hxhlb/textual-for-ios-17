@@ -7,7 +7,7 @@ import SwiftUI
 // resize. When the container size changes, attachment sizes are recomputed and the cache
 // is consulted. If the new sizes hash to the same key, the cached Text is reused.
 //
-// The cache key is derived from the hash of [AttachmentKey: CGSize]. Since attachment
+// The cache key is derived from the hash of attachment sizes. Since attachment
 // sizes often remain constant or repeat during incremental resize (e.g., window resizing),
 // this compact key enables effective caching without storing the full proposal or
 // attributed string. The cache has a count limit of 10 to prevent unbounded growth.
@@ -21,7 +21,7 @@ extension TextFragment {
     var text: Text
 
     @ObservationIgnored private let content: Content
-    @ObservationIgnored private let cache: NSCache<KeyBox<[AttachmentKey: CGSize]>, Box<Text>>
+    @ObservationIgnored private let cache: NSCache<KeyBox<[AttachmentKey: AttachmentSizeCacheKey]>, Box<Text>>
 
     init(_ content: Content, environment: TextEnvironmentValues) {
       let attachmentSizes = content.attachmentSizes(for: .unspecified, in: environment)
@@ -35,12 +35,12 @@ extension TextFragment {
       self.cache = NSCache()
       self.cache.countLimit = 10
 
-      self.cache.setObject(Box(self.text), forKey: KeyBox(attachmentSizes))
+      self.cache.setObject(Box(self.text), forKey: KeyBox(attachmentSizes.cacheKey))
     }
 
     func sizeChanged(_ size: CGSize, environment: TextEnvironmentValues) {
       let attachmentSizes = content.attachmentSizes(for: .init(size), in: environment)
-      let cacheKey = KeyBox(attachmentSizes)
+      let cacheKey = KeyBox(attachmentSizes.cacheKey)
 
       if let text = cache.object(forKey: cacheKey) {
         self.text = text.wrappedValue
@@ -55,6 +55,22 @@ extension TextFragment {
         self.text = text
       }
     }
+  }
+}
+
+private struct AttachmentSizeCacheKey: Hashable {
+  let width: CGFloat
+  let height: CGFloat
+
+  init(_ size: CGSize) {
+    self.width = size.width
+    self.height = size.height
+  }
+}
+
+private extension Dictionary where Key == AttachmentKey, Value == CGSize {
+  var cacheKey: [AttachmentKey: AttachmentSizeCacheKey] {
+    mapValues(AttachmentSizeCacheKey.init)
   }
 }
 

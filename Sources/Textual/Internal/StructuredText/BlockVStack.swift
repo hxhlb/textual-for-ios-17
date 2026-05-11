@@ -20,7 +20,7 @@ extension StructuredText {
     }
 
     var body: some View {
-      Group(subviews: content) { children in
+      BlockSubviews(content: content) { children in
         BlockVStackLayout(textAlignment: textAlignment) {
           ForEach(children) {
             BlockLayoutView($0)
@@ -32,6 +32,25 @@ extension StructuredText {
 }
 
 extension StructuredText {
+  fileprivate struct BlockSubviews<Content: View, Result: View>: View {
+    let content: Content
+    @ViewBuilder let transform: (_VariadicView.Children) -> Result
+
+    var body: some View {
+      _VariadicView.Tree(BlockSubviewsRoot(transform: transform)) {
+        content
+      }
+    }
+  }
+
+  fileprivate struct BlockSubviewsRoot<Result: View>: _VariadicView.MultiViewRoot {
+    @ViewBuilder let transform: (_VariadicView.Children) -> Result
+
+    func body(children: _VariadicView.Children) -> some View {
+      transform(children)
+    }
+  }
+
   struct BlockAlignmentKey: LayoutValueKey {
     static let defaultValue: TextAlignment? = nil
   }

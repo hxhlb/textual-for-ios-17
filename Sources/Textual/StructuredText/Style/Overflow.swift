@@ -76,8 +76,14 @@ public struct Overflow<Content: View>: View {
             }
         }
       }
-      .onScrollGeometryChange(for: CGFloat.self, of: \.containerSize.width) {
-        containerWidth = $1
+      .background(
+        GeometryReader { geometry in
+          Color.clear
+            .preference(key: OverflowContainerWidthKey.self, value: geometry.size.width)
+        }
+      )
+      .onPreferenceChange(OverflowContainerWidthKey.self) { width in
+        containerWidth = width
       }
       // Propagate gesture exclusion area
       .background(
@@ -90,6 +96,14 @@ public struct Overflow<Content: View>: View {
         }
       )
     }
+  }
+}
+
+private struct OverflowContainerWidthKey: PreferenceKey {
+  static let defaultValue: CGFloat? = nil
+
+  static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+    value = nextValue() ?? value
   }
 }
 
