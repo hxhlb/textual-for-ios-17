@@ -68,8 +68,14 @@ public struct Overflow<Content: View>: View {
           content(.scroll(containerWidth: containerWidth))
             .background(
               GeometryReader { geometry in
+                let height = geometry.size.height
+
                 Color.clear
-                  .preference(key: OverflowContentHeightKey.self, value: geometry.size.height)
+                  .task(id: RoundedGeometryValue(height)) {
+                    await MainActor.run {
+                      updateContentHeight(height)
+                    }
+                  }
               }
             )
             // Make text selection local in scrollable regions
@@ -79,19 +85,18 @@ public struct Overflow<Content: View>: View {
             }
         }
       }
-      .onPreferenceChange(OverflowContentHeightKey.self) { height in
-        guard abs(height - (contentHeight ?? 0)) > 0.5 else { return }
-        contentHeight = height
-      }
       .background(
         GeometryReader { geometry in
+          let width = geometry.size.width
+
           Color.clear
-            .preference(key: OverflowContainerWidthKey.self, value: geometry.size.width)
+            .task(id: RoundedGeometryValue(width)) {
+              await MainActor.run {
+                updateContainerWidth(width)
+              }
+            }
         }
       )
-      .onPreferenceChange(OverflowContainerWidthKey.self) { width in
-        containerWidth = width
-      }
       // Propagate gesture exclusion area
       .background(
         GeometryReader { geometry in
@@ -104,21 +109,36 @@ public struct Overflow<Content: View>: View {
       )
     }
   }
-}
 
-private struct OverflowContentHeightKey: PreferenceKey {
-  static let defaultValue: CGFloat = 0
+  private func updateContentHeight(_ height: CGFloat) {
+    guard height.isFinite,
+          height > 0,
+          abs(height - (contentHeight ?? 0)) > 0.5 else {
+      return
+    }
+    contentHeight = height
+  }
 
-  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-    value = max(value, nextValue())
+  private func updateContainerWidth(_ width: CGFloat) {
+    guard width.isFinite,
+          width > 0,
+          abs(width - (containerWidth ?? 0)) > 0.5 else {
+      return
+    }
+    containerWidth = width
   }
 }
 
-private struct OverflowContainerWidthKey: PreferenceKey {
-  static let defaultValue: CGFloat? = nil
+private struct RoundedGeometryValue: Equatable {
+  let value: Int
 
-  static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
-    value = nextValue() ?? value
+  init(_ value: CGFloat) {
+    guard value.isFinite else {
+      self.value = -1
+      return
+    }
+
+    self.value = Int(value.rounded(.toNearestOrAwayFromZero))
   }
 }
 

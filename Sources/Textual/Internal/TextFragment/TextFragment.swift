@@ -39,17 +39,13 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
     text
       .customAttribute(TextFragmentAttribute())
       .background(
-        GeometryReader { geometry in
-          Color.clear
-            .preference(key: TextContainerSizeKey.self, value: geometry.textContainerSize)
+        TextContainerSizeReader { size in
+          guard let textBuilder else {
+            return
+          }
+          textBuilder.sizeChangedIfNeeded(size, environment: textEnvironment)
         }
       )
-      .onPreferenceChange(TextContainerSizeKey.self) { size in
-        guard let size, let textBuilder else {
-          return
-        }
-        textBuilder.sizeChangedIfNeeded(size, environment: textEnvironment)
-      }
       .onChange(of: content, initial: true) { _, newValue in
         self.textBuilder = TextBuilder(newValue, environment: textEnvironment)
       }
@@ -66,13 +62,45 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
 struct TextFragmentAttribute: TextAttribute {
 }
 
-private struct TextContainerSizeKey: PreferenceKey {
-  static let defaultValue: CGSize? = nil
+private struct TextContainerSizeReader: View {
+  let onChange: @MainActor (CGSize) -> Void
 
-  static func reduce(value: inout CGSize?, nextValue: () -> CGSize?) {
-    if let next = nextValue() {
-      value = next
+  var body: some View {
+    GeometryReader { geometry in
+      let size = geometry.textContainerSize
+
+      Color.clear
+        .task(id: TextContainerSizeTaskID(size)) {
+          guard let size else {
+            return
+          }
+          await MainActor.run {
+            onChange(size)
+          }
+        }
     }
+  }
+}
+
+private struct TextContainerSizeTaskID: Equatable {
+  let width: Int
+  let height: Int
+
+  init(_ size: CGSize?) {
+    guard let size else {
+      self.width = -1
+      self.height = -1
+      return
+    }
+
+    guard size.width.isFinite, size.height.isFinite else {
+      self.width = -1
+      self.height = -1
+      return
+    }
+
+    self.width = Int(size.width.rounded(.toNearestOrAwayFromZero))
+    self.height = Int(size.height.rounded(.toNearestOrAwayFromZero))
   }
 }
 
