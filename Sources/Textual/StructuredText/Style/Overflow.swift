@@ -66,15 +66,22 @@ public struct Overflow<Content: View>: View {
           Color.clear
             .frame(minHeight: contentHeight)
           content(.scroll(containerWidth: containerWidth))
-            .onGeometryChange(for: CGFloat.self, of: \.size.height) {
-              contentHeight = $0
-            }
+            .background(
+              GeometryReader { geometry in
+                Color.clear
+                  .preference(key: OverflowContentHeightKey.self, value: geometry.size.height)
+              }
+            )
             // Make text selection local in scrollable regions
             .modifier(TextSelectionInteraction())
             .transformPreference(Text.LayoutKey.self) { value in
               value = []
             }
         }
+      }
+      .onPreferenceChange(OverflowContentHeightKey.self) { height in
+        guard abs(height - (contentHeight ?? 0)) > 0.5 else { return }
+        contentHeight = height
       }
       .background(
         GeometryReader { geometry in
@@ -96,6 +103,14 @@ public struct Overflow<Content: View>: View {
         }
       )
     }
+  }
+}
+
+private struct OverflowContentHeightKey: PreferenceKey {
+  static let defaultValue: CGFloat = 0
+
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = max(value, nextValue())
   }
 }
 
