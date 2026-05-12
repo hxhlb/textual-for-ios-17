@@ -19,8 +19,8 @@ import SwiftUI
 // coordinate space isolation and keep scrollable regions interactive.
 //
 // An ancestor view must define a named coordinate space (.textContainer) for the text
-// container. TextFragment uses onGeometryChange to observe the container size and rebuild
-// Text when attachment sizes need to change.
+// container. TextFragment observes the container size and rebuilds Text when attachment
+// sizes need to change.
 //
 // TextFragment is used by InlineText and StructuredText (via BlockContent) to render
 // attributed content with inline attachments, links, and selection.
@@ -38,9 +38,17 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
   var body: some View {
     text
       .customAttribute(TextFragmentAttribute())
-      .onGeometryChange(for: CGSize?.self, of: \.textContainerSize) { size in
-        guard let size, let textBuilder else { return }
-        textBuilder.sizeChanged(size, environment: textEnvironment)
+      .background(
+        GeometryReader { geometry in
+          Color.clear
+            .preference(key: TextContainerSizeKey.self, value: geometry.textContainerSize)
+        }
+      )
+      .onPreferenceChange(TextContainerSizeKey.self) { size in
+        guard let size, let textBuilder else {
+          return
+        }
+        textBuilder.sizeChangedIfNeeded(size, environment: textEnvironment)
       }
       .onChange(of: content, initial: true) { _, newValue in
         self.textBuilder = TextBuilder(newValue, environment: textEnvironment)
@@ -56,6 +64,16 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
 }
 
 struct TextFragmentAttribute: TextAttribute {
+}
+
+private struct TextContainerSizeKey: PreferenceKey {
+  static let defaultValue: CGSize? = nil
+
+  static func reduce(value: inout CGSize?, nextValue: () -> CGSize?) {
+    if let next = nextValue() {
+      value = next
+    }
+  }
 }
 
 extension Text.Layout {

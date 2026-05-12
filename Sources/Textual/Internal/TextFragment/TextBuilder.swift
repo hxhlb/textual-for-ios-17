@@ -22,6 +22,7 @@ extension TextFragment {
 
     @ObservationIgnored private let content: Content
     @ObservationIgnored private let cache: NSCache<KeyBox<[AttachmentKey: AttachmentSizeCacheKey]>, Box<Text>>
+    @ObservationIgnored private var lastContainerSize: CGSize?
 
     init(_ content: Content, environment: TextEnvironmentValues) {
       let attachmentSizes = content.attachmentSizes(for: .unspecified, in: environment)
@@ -38,7 +39,16 @@ extension TextFragment {
       self.cache.setObject(Box(self.text), forKey: KeyBox(attachmentSizes.cacheKey))
     }
 
-    func sizeChanged(_ size: CGSize, environment: TextEnvironmentValues) {
+    func sizeChangedIfNeeded(_ size: CGSize, environment: TextEnvironmentValues) {
+      guard size.width.isFinite,
+            size.height.isFinite,
+            size.width > 0,
+            size.height > 0,
+            size.isMeaningfullyDifferent(from: lastContainerSize) else {
+        return
+      }
+
+      lastContainerSize = size
       let attachmentSizes = content.attachmentSizes(for: .init(size), in: environment)
       let cacheKey = KeyBox(attachmentSizes.cacheKey)
 
@@ -55,6 +65,17 @@ extension TextFragment {
         self.text = text
       }
     }
+  }
+}
+
+private extension CGSize {
+  func isMeaningfullyDifferent(from other: CGSize?) -> Bool {
+    guard let other else {
+      return true
+    }
+
+    return abs(width - other.width) > 1
+      || abs(height - other.height) > 1
   }
 }
 
