@@ -68,21 +68,25 @@ private struct TextContainerSizeReader: View {
   var body: some View {
     GeometryReader { geometry in
       let size = geometry.textContainerSize
+      let sizeID = TextContainerSizeChangeID(size)
 
       Color.clear
-        .task(id: TextContainerSizeTaskID(size)) {
-          guard let size else {
-            return
-          }
-          await MainActor.run {
-            onChange(size)
-          }
+        .onChange(of: sizeID, initial: true) { _, _ in
+          report(size)
         }
     }
   }
+
+  @MainActor
+  private func report(_ size: CGSize?) {
+    guard let size else {
+      return
+    }
+    onChange(size)
+  }
 }
 
-private struct TextContainerSizeTaskID: Equatable {
+private struct TextContainerSizeChangeID: Equatable {
   let width: Int
   let height: Int
 
