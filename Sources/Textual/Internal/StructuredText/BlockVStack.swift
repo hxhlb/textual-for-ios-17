@@ -72,7 +72,11 @@ extension StructuredText {
       content
         .onPreferenceChange(BlockSpacingKey.self) { @MainActor value in
           // Override with the resolved list item spacing if enabled
-          blockSpacing = listItemSpacingEnabled ? resolvedListItemSpacing : value
+          let resolvedSpacing = listItemSpacingEnabled ? resolvedListItemSpacing : value
+          guard blockSpacing != resolvedSpacing else {
+            return
+          }
+          blockSpacing = resolvedSpacing
         }
         .layoutValue(key: BlockSpacingKey.self, value: blockSpacing)
     }
@@ -154,6 +158,26 @@ extension StructuredText {
           currentY += cache.spacings[index]
         }
       }
+    }
+
+    func explicitAlignment(
+      of guide: HorizontalAlignment,
+      in bounds: CGRect,
+      proposal: ProposedViewSize,
+      subviews: Subviews,
+      cache: inout Cache
+    ) -> CGFloat? {
+      nil
+    }
+
+    func explicitAlignment(
+      of guide: VerticalAlignment,
+      in bounds: CGRect,
+      proposal: ProposedViewSize,
+      subviews: Subviews,
+      cache: inout Cache
+    ) -> CGFloat? {
+      nil
     }
   }
 }
