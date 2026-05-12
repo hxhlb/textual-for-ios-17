@@ -30,27 +30,27 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
   @State private var textBuilder: TextBuilder?
 
   private let content: Content
+  private let attachments: Set<AnyAttachment>
 
   init(_ content: Content) {
     self.content = content
+    self.attachments = content.attachments()
   }
 
   var body: some View {
     text
       .customAttribute(TextFragmentAttribute())
-      .background(
-        TextContainerSizeReader { size in
-          guard let textBuilder else {
-            return
-          }
-          textBuilder.sizeChangedIfNeeded(size, environment: textEnvironment)
+      .modifier(TextContainerSizeObserver(isEnabled: !attachments.isEmpty) { size in
+        guard let textBuilder else {
+          return
         }
-      )
+        textBuilder.sizeChangedIfNeeded(size, environment: textEnvironment)
+      })
       .onChange(of: content, initial: true) { _, newValue in
         self.textBuilder = TextBuilder(newValue, environment: textEnvironment)
       }
       .modifier(TextSelectionBackground())
-      .modifier(AttachmentOverlay(attachments: content.attachments()))
+      .modifier(AttachmentOverlay(attachments: attachments))
       .modifier(TextLinkInteraction())
   }
 
@@ -60,6 +60,19 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
 }
 
 struct TextFragmentAttribute: TextAttribute {
+}
+
+private struct TextContainerSizeObserver: ViewModifier {
+  let isEnabled: Bool
+  let onChange: @MainActor (CGSize) -> Void
+
+  func body(content: Content) -> some View {
+    if isEnabled {
+      content.background(TextContainerSizeReader(onChange: onChange))
+    } else {
+      content
+    }
+  }
 }
 
 private struct TextContainerSizeReader: View {
